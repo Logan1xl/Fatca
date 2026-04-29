@@ -49,14 +49,16 @@ class ValidationError extends Model
     public function getCategoryLabelAttribute(): string
     {
         return match ($this->category) {
-            'structure' => 'Structure XML',
-            'format' => 'Format',
-            'characters' => 'Caractères',
-            'size' => 'Taille',
-            'business_rule' => 'Règle métier',
-            'encoding' => 'Encodage',
-            'namespace' => 'Namespace',
-            'required' => 'Champ requis',
+            'structure' => 'Structure (Organisation)',
+            'format' => 'Format (Technique)',
+            'characters' => 'Caractères Interdits',
+            'data' => 'Données Clients',
+            'fatca_status' => 'Statut FATCA',
+            'financial' => 'Comptes Financiers',
+            'coherence' => 'Cohérence Logique',
+            'conversion' => 'Conversion XML',
+            'regulatory' => 'Réglementaire',
+            'required' => 'Champ Requis',
             default => ucfirst($this->category),
         };
     }

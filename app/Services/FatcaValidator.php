@@ -169,29 +169,184 @@ class FatcaValidator
         $reports = $this->xpath->query('//ftc:AccountReport');
         for ($i = 0; $i < $reports->length; $i++) {
             $node = $reports->item($i);
-            $idx = $i + 1;
+            
+            // 1. AccountNumber
+            $this->validateElement($node, 'ftc:AccountNumber', 'AccountNumber', 1, 100, 'Section 6.4.2', true);
 
-            // AccountNumber
-            $acct = $this->xpath->query('ftc:AccountNumber', $node);
-            if ($acct->length > 0) {
-                $val = $acct->item(0)->textContent;
-                if (strlen($val) > 100) {
-                    $this->addError('error', 'size', 'AccountNumber', 'Numéro de compte trop long (Max 100)', 'Max 100 car.', strlen($val), 'Vérifier le numéro de compte', 'Section 6.4.2');
-                }
-                if ($val !== trim($val)) {
-                    $this->addError('warning', 'characters', 'AccountNumber', 'Espaces inutiles détectés', 'Pas d\'espaces en début/fin', '"'.$val.'"', 'Supprimer les espaces', 'Section 2.3', true);
-                }
+            // 2. AccountBalance
+            $this->validateAmount($node, 'ftc:AccountBalance', 'AccountBalance', 'Section 4.1');
+
+            // 3. AccountHolder (Individual or Organisation)
+            $this->validateAccountHolder($node);
+
+            // 4. Payments
+            $payments = $this->xpath->query('ftc:Payment', $node);
+            foreach ($payments as $payment) {
+                $this->validateAmount($payment, 'ftc:PaymentAmnt', 'PaymentAmnt', 'Section 4.1');
             }
+        }
+    }
 
-            // AccountBalance
-            $bal = $this->xpath->query('ftc:AccountBalance', $node);
-            if ($bal->length > 0) {
-                $amount = $bal->item(0)->textContent;
-                if (str_contains($amount, ',')) {
-                    $this->addError('error', 'format', 'AccountBalance', 'Virgule utilisée comme séparateur décimal', 'Point (.) obligatoire', $amount, 'Utiliser le point comme séparateur', 'Section 4.1', true);
+    /**
+     * Valide les détails du titulaire du compte.
+     */
+    private function validateAccountHolder(\DOMNode $accountReport): void
+    {
+        $individual = $this->xpath->query('ftc:AccountHolder/ftc:Individual', $accountReport);
+        $organisation = $this->xpath->query('ftc:AccountHolder/ftc:Organisation', $accountReport);
+
+        if ($individual->length > 0) {
+            $ind = $individual->item(0);
+            $this->validateElement($ind, 'sfa:ResCountryCode', 'ResCountryCode', 2, 2, 'Section 4.5.1', true, 'data');
+            $this->validateTINElement($ind, 'sfa:TIN', 'TIN', 'Section 4.5.2');
+            $this->validateElement($ind, 'sfa:Name/sfa:FirstName', 'FirstName', 1, 100, 'Section 4.5.3', true, 'data');
+            $this->validateElement($ind, 'sfa:Name/sfa:LastName', 'LastName', 1, 100, 'Section 4.5.3', true, 'data');
+            $this->validateBirthDate($ind);
+            $this->validateAddress($ind);
+            
+            // US Indicia Check
+            $this->checkUsIndicia($ind);
+        } elseif ($organisation->length > 0) {
+            $org = $organisation->item(0);
+            $this->validateElement($org, 'sfa:ResCountryCode', 'ResCountryCode', 2, 2, 'Section 4.5.1', true, 'data');
+            $this->validateTINElement($org, 'sfa:TIN', 'TIN', 'Section 4.5.2');
+            $this->validateElement($org, 'sfa:Name', 'OrganisationName', 1, 200, 'Section 4.5.3', true, 'data');
+            $this->validateAddress($org);
+            
+            // Organisation specific checks
+            $holderType = $this->xpath->query('../ftc:AcctHolderType', $org);
+            if ($holderType->length === 0) {
+                $this->addError('error', 'fatca_status', 'AcctHolderType', 'Type de titulaire d\'entité manquant', 'FATCA101-FATCA105', 'absent', 'Préciser le statut FATCA de l\'entité', 'Section 4.6');
+            }
+        } else {
+            $this->addError('error', 'data', 'AccountHolder', 'Titulaire de compte non identifié', 'Individual ou Organisation', 'absent', 'Vérifier les données du client', 'Section 4.5');
+        }
+    }
+
+    /**
+     * Valide l'adresse d'un titulaire.
+     */
+    private function validateAddress(\DOMNode $parent): void
+    {
+        $address = $this->xpath->query('sfa:Address', $parent);
+        if ($address->length === 0) {
+            $this->addError('error', 'data', 'Address', 'Adresse manquante', 'Adresse structurée ou libre', 'absent', 'Renseigner l\'adresse du client', 'Section 4.5.4');
+            return;
+        }
+
+        $addr = $address->item(0);
+        $this->validateElement($addr, 'sfa:CountryCode', 'Address/CountryCode', 2, 2, 'Section 4.5.4', true, 'data');
+        
+        $free = $this->xpath->query('sfa:AddressFree', $addr);
+        $fix = $this->xpath->query('sfa:AddressFix', $addr);
+        
+        if ($free->length === 0 && $fix->length === 0) {
+            $this->addError('error', 'data', 'Address', 'Détails d\'adresse manquants', 'AddressFree ou AddressFix', 'vide', 'Préciser la rue et la ville', 'Section 4.5.4');
+        }
+    }
+
+    /**
+     * Valide la date de naissance.
+     */
+    private function validateBirthDate(\DOMNode $individual): void
+    {
+        $dob = $this->xpath->query('sfa:BirthInfo/sfa:BirthDate', $individual);
+        if ($dob->length > 0) {
+            $val = trim($dob->item(0)->textContent);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $val)) {
+                $this->addError('error', 'format', 'BirthDate', 'Format de date de naissance invalide', 'AAAA-MM-JJ', $val, 'Utiliser le format ISO (Ex: 1980-01-31)', 'Section 4.5.5', true);
+            } else {
+                $year = (int)substr($val, 0, 4);
+                if ($year < 1900 || $year > date('Y')) {
+                    $this->addError('warning', 'coherence', 'BirthDate', 'Date de naissance incohérente', 'Année entre 1900 et '.date('Y'), $val, 'Vérifier la date de naissance', 'Section 4.5.5');
                 }
             }
         }
+    }
+
+    /**
+     * Vérifie les indices d'américanité (US Indicia).
+     */
+    private function checkUsIndicia(\DOMNode $individual): void
+    {
+        $countryNodes = $this->xpath->query('sfa:ResCountryCode', $individual);
+        $country = $countryNodes->length > 0 ? trim($countryNodes->item(0)->textContent) : '';
+        
+        $tinNodes = $this->xpath->query('sfa:TIN', $individual);
+        $tin = $tinNodes->length > 0 ? trim($tinNodes->item(0)->textContent) : '';
+
+        // Check if US TIN is present for non-US resident
+        if ($country !== 'US' && !empty($tin)) {
+            if (preg_match('/^\d{3}-\d{2}-\d{4}$/', $tin) || preg_match('/^\d{9}$/', $tin)) {
+                $this->addError('warning', 'coherence', 'USIndicia', 'Client non-US avec un TIN américain', 'Cohérence TIN/Pays', $tin, 'Vérifier le statut FATCA du client', 'Section 4.5.2');
+            }
+        }
+    }
+
+    /**
+     * Valide un élément générique (existence, longueur, padding).
+     */
+    private function validateElement(\DOMNode $parent, string $query, string $label, int $min, int $max, string $section, bool $required = false, string $category = 'format'): void
+    {
+        $nodes = $this->xpath->query($query, $parent);
+        if ($nodes->length === 0) {
+            if ($required) {
+                $this->addError('error', 'required', $label, "Champ obligatoire '$label' manquant", "Min $min car.", 'absent', "Renseigner la valeur pour $label", $section);
+            }
+            return;
+        }
+
+        $val = $nodes->item(0)->textContent;
+        if (empty(trim($val)) && $required) {
+            $this->addError('error', 'required', $label, "Champ '$label' vide", "Min $min car.", 'vide', "Renseigner la valeur pour $label", $section);
+            return;
+        }
+
+        $this->validateStringNoPadding($val, $label, $section);
+        $this->validateStringSize($val, $label, $min, $max, $section, $category);
+        
+        // Country code specific check
+        if (str_contains(strtolower($label), 'countrycode')) {
+            $code = strtoupper(trim($val));
+            if (!in_array($code, $this->isoCountries)) {
+                $this->addError('error', 'regulatory', $label, "Code pays ISO '$code' invalide", 'ISO 3166-1 (2 car.)', $code, 'Utiliser un code pays standard (Ex: CM, US, FR)', $section);
+            }
+        }
+    }
+
+    /**
+     * Valide un montant financier.
+     */
+    private function validateAmount(\DOMNode $parent, string $query, string $label, string $section): void
+    {
+        $nodes = $this->xpath->query($query, $parent);
+        if ($nodes->length === 0) return;
+
+        $node = $nodes->item(0);
+        $val = $node->textContent;
+        $curr = $node->hasAttribute('currCode') ? $node->getAttribute('currCode') : '';
+
+        if (empty($curr)) {
+            $this->addError('error', 'financial', $label.'/currCode', 'Devise manquante pour le montant', 'Code ISO (ex: USD, XAF)', 'absent', 'Préciser la devise', $section);
+        }
+
+        if (!is_numeric(str_replace(',', '.', $val))) {
+            $this->addError('error', 'format', $label, 'Format numérique invalide', 'Nombre (Ex: 1250.50)', $val, 'Utiliser des chiffres et le point comme séparateur', $section, true);
+        } elseif (str_contains($val, ',')) {
+            $this->addError('error', 'format', $label, 'Séparateur décimal invalide (virgule)', 'Point (.)', $val, 'Remplacer la virgule par un point', $section, true);
+        }
+    }
+
+    /**
+     * Valide spécifiquement l'élément TIN.
+     */
+    private function validateTINElement(\DOMNode $parent, string $query, string $label, string $section): void
+    {
+        $nodes = $this->xpath->query($query, $parent);
+        if ($nodes->length === 0) return;
+
+        $val = $nodes->item(0)->textContent;
+        $this->validateTIN($val, $label, $section, 'data');
     }
 
     /**
@@ -200,21 +355,21 @@ class FatcaValidator
     private function validateStringNoPadding(string $value, string $element, string $section): void
     {
         if ($value !== trim($value)) {
-            $this->addError('warning', 'characters', $element, 'Espaces de remplissage (padding) détectés', 'Pas d\'espaces en début/fin', '"' . $value . '"', 'Supprimer les espaces inutiles', $section, true);
+            $this->addError('warning', 'format', $element, 'Espaces de remplissage (padding) détectés', 'Pas d\'espaces en début/fin', '"' . $value . '"', 'Supprimer les espaces inutiles', $section, true);
         }
     }
 
     /**
      * Valide le format des numéros d'identification fiscale (TIN ou GIIN).
      */
-    private function validateTIN(string $value, string $element, string $section): void
+    private function validateTIN(string $value, string $element, string $section, string $category = 'format'): void
     {
         $val = trim($value);
         if (empty($val)) return;
         
         // Remove common separators for format check if needed, but FATCA prefers certain formats
         if (preg_match('/\s/', $value)) {
-            $this->addError('warning', 'characters', $element, 'Espaces présents dans le TIN', 'Pas d\'espaces', $value, 'Supprimer les espaces dans le TIN', $section, true);
+            $this->addError('warning', 'format', $element, 'Espaces présents dans le TIN', 'Pas d\'espaces', $value, 'Supprimer les espaces dans le TIN', $section, true);
         }
 
         $giinPattern = '/^[A-Z0-9]{6}\.[A-Z0-9]{5}\.[A-Z]{2}\.[0-9]{3}$/i';
@@ -223,22 +378,22 @@ class FatcaValidator
         $tinDash2 = '/^\d{2}-\d{7}$/';
         
         if (!preg_match($giinPattern, $val) && !preg_match($tin9, $val) && !preg_match($tinDash1, $val) && !preg_match($tinDash2, $val)) {
-            $this->addError('error', 'format', $element, 'Format TIN non conforme (doit être 9 chiffres ou GIIN)', 'SSN, ITIN, EIN ou GIIN', $val, 'Corriger le format du TIN', $section, true);
+            $this->addError('error', $category, $element, 'Format TIN non conforme (doit être 9 chiffres ou GIIN)', 'SSN, ITIN, EIN ou GIIN', $val, 'Corriger le format du TIN', $section, true);
         }
     }
 
     /**
      * Valide la longueur d'une chaîne de caractères.
      */
-    private function validateStringSize(string $value, string $element, int $min, int $max, string $section): void
+    private function validateStringSize(string $value, string $element, int $min, int $max, string $section, string $category = 'format'): void
     {
         $val = trim($value);
         $len = strlen($val);
         if ($len < $min) {
-            $this->addError('error', 'size', $element, 'Valeur trop courte (' . $len . ' car.)', "Min $min car.", $val, 'Compléter l\'information', $section, true);
+            $this->addError('error', $category, $element, 'Valeur trop courte (' . $len . ' car.)', "Min $min car.", $val, 'Compléter l\'information', $section, true);
         }
         if ($len > $max) {
-            $this->addError('error', 'size', $element, 'Valeur trop longue (' . $len . ' car.)', "Max $max car.", substr($val, 0, 50) . '...', 'Tronquer la valeur', $section, true);
+            $this->addError('error', $category, $element, 'Valeur trop longue (' . $len . ' car.)', "Max $max car.", substr($val, 0, 50) . '...', 'Tronquer la valeur', $section, true);
         }
     }
 
@@ -258,6 +413,30 @@ class FatcaValidator
             'fatca_section' => $section,
             'auto_correctable' => $correctable,
         ];
+    }
+
+    /**
+     * Valide les éléments DocSpec dans tout le document.
+     */
+    private function validateDocSpecs(): void
+    {
+        $nodes = $this->xpath->query('//ftc:DocSpec');
+        foreach ($nodes as $node) {
+            // DocTypeIndic
+            $typeIndic = $this->xpath->query('ftc:DocTypeIndic', $node);
+            if ($typeIndic->length > 0) {
+                $val = $typeIndic->item(0)->textContent;
+                if (!in_array($val, ['FATCA1', 'FATCA2', 'FATCA3', 'FATCA4'])) {
+                    $this->addError('error', 'format', 'DocTypeIndic', 'Code DocTypeIndic invalide', 'FATCA1, FATCA2, FATCA3 ou FATCA4', $val, 'Utiliser un code FATCA valide', 'Section 5');
+                }
+            }
+
+            // DocRefId
+            $refId = $this->xpath->query('ftc:DocRefId', $node);
+            if ($refId->length === 0) {
+                $this->addError('error', 'required', 'DocRefId', 'DocRefId manquant', 'ID unique', 'absent', 'Générer un DocRefId unique', 'Section 5');
+            }
+        }
     }
 
     /**

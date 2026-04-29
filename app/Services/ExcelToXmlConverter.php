@@ -65,13 +65,22 @@ class ExcelToXmlConverter
                     if (!empty(trim((string)$val))) $nonEmptyCount++;
                 }
                 
-                // If we find a row with at least 3 potential headers, assume it's the header row
-                if ($nonEmptyCount >= 3) {
+                // If we find a row with at least 2 potential headers, assume it's the header row
+                if ($nonEmptyCount >= 2) {
                     $headerRowIndex = $index;
                     foreach ($row as $col => $header) {
-                        $headers[$col] = $this->normalizeHeader(trim((string)$header));
+                        $headerText = (string)($header ?? '');
+                        if (!empty(trim($headerText))) {
+                            $headers[$col] = $this->normalizeHeader($headerText);
+                        }
                     }
-                    break;
+                    // Only accept if we actually got some valid headers
+                    if (count($headers) >= 2) {
+                        break;
+                    } else {
+                        $headerRowIndex = null;
+                        $headers = [];
+                    }
                 }
             }
 

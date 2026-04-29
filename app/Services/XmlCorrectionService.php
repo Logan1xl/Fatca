@@ -63,12 +63,14 @@ class XmlCorrectionService
                 break;
 
             case 'format':
-                if ($error->element === 'ReportingPeriod') {
+                if (str_contains($error->element, 'Date')) {
                     $this->fixDateFormat($xpath, $error->element);
                 } elseif ($error->element === 'Timestamp') {
                     $this->fixTimestampFormat($xpath, $error->element);
                 } elseif (str_contains($error->element, 'TIN')) {
                     $this->fixTinFormat($xpath, $error->element);
+                } elseif (str_contains($error->element, 'Balance') || str_contains($error->element, 'Amnt')) {
+                    $this->fixAmountFormat($xpath, $error->element);
                 }
                 break;
 
@@ -144,6 +146,20 @@ class XmlCorrectionService
         foreach ($nodes as $node) {
             $val = preg_replace('/[^A-Z0-9.\-]/i', '', $node->textContent);
             $node->textContent = strtoupper($val);
+        }
+    }
+
+    /**
+     * Corrige le format des montants (remplace la virgule par un point).
+     */
+    private function fixAmountFormat(DOMXPath $xpath, string $elementName): void
+    {
+        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        foreach ($nodes as $node) {
+            $val = str_replace(',', '.', $node->textContent);
+            if (is_numeric($val)) {
+                $node->textContent = number_format((float)$val, 2, '.', '');
+            }
         }
     }
 
