@@ -51,43 +51,58 @@ class XmlCorrectionService
      */
     private function applyCorrection(DOMDocument $dom, DOMXPath $xpath, ValidationError $error): void
     {
+        $rowIndex = $error->row_reference;
+        $elementName = $error->element;
+
         // Category based correction logic
         switch ($error->category) {
             case 'characters':
-                // Handled globally if it was SQL injection, but for specific elements:
-                $this->sanitizeElement($xpath, $error->element);
+                $this->sanitizeElement($xpath, $elementName, $rowIndex);
                 break;
 
             case 'size':
-                $this->truncateElement($xpath, $error->element, $this->extractLimit($error->expected_value));
+                $this->truncateElement($xpath, $elementName, $this->extractLimit($error->expected_value), $rowIndex);
                 break;
 
             case 'format':
-                if (str_contains($error->element, 'Date')) {
-                    $this->fixDateFormat($xpath, $error->element);
-                } elseif ($error->element === 'Timestamp') {
-                    $this->fixTimestampFormat($xpath, $error->element);
-                } elseif (str_contains($error->element, 'TIN')) {
-                    $this->fixTinFormat($xpath, $error->element);
-                } elseif (str_contains($error->element, 'Balance') || str_contains($error->element, 'Amnt')) {
-                    $this->fixAmountFormat($xpath, $error->element);
+                if (str_contains($elementName, 'Date')) {
+                    $this->fixDateFormat($xpath, $elementName, $rowIndex);
+                } elseif ($elementName === 'Timestamp') {
+                    $this->fixTimestampFormat($xpath, $elementName, $rowIndex);
+                } elseif (str_contains($elementName, 'TIN')) {
+                    $this->fixTinFormat($xpath, $elementName, $rowIndex);
+                } elseif (str_contains($elementName, 'Balance') || str_contains($elementName, 'Amnt')) {
+                    $this->fixAmountFormat($xpath, $elementName, $rowIndex);
                 }
                 break;
 
             case 'business_rule':
-                if ($error->element === 'DocTypeIndic' && str_contains($error->actual_value, '11')) {
-                    $this->replaceValue($xpath, $error->element, str_replace('11', '1', $error->actual_value));
+                if ($elementName === 'DocTypeIndic' && str_contains($error->actual_value, '11')) {
+                    $this->replaceValue($xpath, $elementName, str_replace('11', '1', $error->actual_value), $rowIndex);
                 }
                 break;
         }
     }
 
     /**
+     * Construit une requête XPath ciblée sur un élément et éventuellement une ligne.
+     */
+    private function getTargetQuery(string $elementName, ?int $rowIndex = null): string
+    {
+        // Simple case: MessageSpec elements (no rowIndex)
+        if ($rowIndex === null) {
+            return "//*[local-name()='$elementName']";
+        }
+        // AccountReport elements: target specific rowIndex
+        return "//ftc:AccountReport[@rowIndex='$rowIndex']//*[local-name()='$elementName']";
+    }
+
+    /**
      * Nettoie le contenu d'un élément (supprime les séquences interdites).
      */
-    private function sanitizeElement(DOMXPath $xpath, string $elementName): void
+    private function sanitizeElement(DOMXPath $xpath, string $elementName, ?int $rowIndex = null): void
     {
-        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        $nodes = $xpath->query($this->getTargetQuery($elementName, $rowIndex));
         foreach ($nodes as $node) {
             $val = $node->textContent;
             $val = str_replace(['--', '/*', '&#'], '', $val);
@@ -98,10 +113,10 @@ class XmlCorrectionService
     /**
      * Tronque le texte d'un élément s'il dépasse la limite autorisée.
      */
-    private function truncateElement(DOMXPath $xpath, string $elementName, int $limit): void
+    private function truncateElement(DOMXPath $xpath, string $elementName, int $limit, ?int $rowIndex = null): void
     {
         if ($limit <= 0) return;
-        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        $nodes = $xpath->query($this->getTargetQuery($elementName, $rowIndex));
         foreach ($nodes as $node) {
             if (strlen($node->textContent) > $limit) {
                 $node->textContent = substr($node->textContent, 0, $limit);
@@ -112,9 +127,9 @@ class XmlCorrectionService
     /**
      * Corrige le format de date (YYYY-MM-DD).
      */
-    private function fixDateFormat(DOMXPath $xpath, string $elementName): void
+    private function fixDateFormat(DOMXPath $xpath, string $elementName, ?int $rowIndex = null): void
     {
-        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        $nodes = $xpath->query($this->getTargetQuery($elementName, $rowIndex));
         foreach ($nodes as $node) {
             $ts = strtotime($node->textContent);
             if ($ts) {
@@ -126,9 +141,9 @@ class XmlCorrectionService
     /**
      * Corrige le format du timestamp (ISO 8601).
      */
-    private function fixTimestampFormat(DOMXPath $xpath, string $elementName): void
+    private function fixTimestampFormat(DOMXPath $xpath, string $elementName, ?int $rowIndex = null): void
     {
-        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        $nodes = $xpath->query($this->getTargetQuery($elementName, $rowIndex));
         foreach ($nodes as $node) {
             $ts = strtotime($node->textContent);
             if ($ts) {
@@ -140,9 +155,9 @@ class XmlCorrectionService
     /**
      * Corrige le format des numéros TIN/GIIN.
      */
-    private function fixTinFormat(DOMXPath $xpath, string $elementName): void
+    private function fixTinFormat(DOMXPath $xpath, string $elementName, ?int $rowIndex = null): void
     {
-        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        $nodes = $xpath->query($this->getTargetQuery($elementName, $rowIndex));
         foreach ($nodes as $node) {
             $val = preg_replace('/[^A-Z0-9.\-]/i', '', $node->textContent);
             $node->textContent = strtoupper($val);
@@ -152,9 +167,9 @@ class XmlCorrectionService
     /**
      * Corrige le format des montants (remplace la virgule par un point).
      */
-    private function fixAmountFormat(DOMXPath $xpath, string $elementName): void
+    private function fixAmountFormat(DOMXPath $xpath, string $elementName, ?int $rowIndex = null): void
     {
-        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        $nodes = $xpath->query($this->getTargetQuery($elementName, $rowIndex));
         foreach ($nodes as $node) {
             $val = str_replace(',', '.', $node->textContent);
             if (is_numeric($val)) {
@@ -166,9 +181,9 @@ class XmlCorrectionService
     /**
      * Remplace la valeur d'un élément par une nouvelle valeur.
      */
-    private function replaceValue(DOMXPath $xpath, string $elementName, string $newValue): void
+    private function replaceValue(DOMXPath $xpath, string $elementName, string $newValue, ?int $rowIndex = null): void
     {
-        $nodes = $xpath->query("//*[local-name()='$elementName']");
+        $nodes = $xpath->query($this->getTargetQuery($elementName, $rowIndex));
         foreach ($nodes as $node) {
             $node->textContent = $newValue;
         }

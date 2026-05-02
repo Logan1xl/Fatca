@@ -94,6 +94,8 @@ class ReportController extends Controller
         $report->update([
             'xml_path' => $xmlPath,
             'total_records' => $conversionResult['records'],
+            'raw_data' => $conversionResult['raw_data'],
+            'mapping' => $conversionResult['mapping'] ?? [],
         ]);
 
         // 2. Validate FATCA rules

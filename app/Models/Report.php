@@ -24,12 +24,16 @@ class Report extends Model
         'total_errors',
         'total_warnings',
         'total_records',
+        'raw_data',
+        'mapping',
     ];
 
     protected function casts(): array
     {
         return [
             'reporting_period' => 'date',
+            'raw_data' => 'array',
+            'mapping' => 'array',
         ];
     }
 

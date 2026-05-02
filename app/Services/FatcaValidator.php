@@ -15,6 +15,7 @@ class FatcaValidator
     private DOMDocument $dom;
     private DOMXPath $xpath;
     private array $errors = [];
+    private ?int $currentRowIndex = null;
     private array $isoCountries = ['AF','AL','DZ','AS','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB','BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI','KH','CM','CA','CV','CF','TD','CL','CN','CO','KM','CG','CD','CR','CI','HR','CU','CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','ET','FJ','FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ','KE','KI','KP','KR','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MK','MG','MW','MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN','ME','MA','MZ','MM','NA','NR','NP','NL','NZ','NI','NE','NG','NO','OM','PK','PW','PA','PG','PY','PE','PH','PL','PT','QA','RO','RU','RW','KN','LC','VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA','ES','LK','SD','SR','SZ','SE','CH','SY','TW','TJ','TZ','TH','TL','TG','TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VE','VN','YE','ZM','ZW'];
 
     /**
@@ -53,6 +54,12 @@ class FatcaValidator
 
         // 4. Validate namespaces
         $this->validateNamespaces();
+        
+        // Check if mapping was successful (by checking for any AccountReport data)
+        if ($this->xpath->query('//ftc:AccountReport')->length === 0) {
+            $this->addError('warning', 'structure', 'XML', 'Aucune donnée de compte détectée. Vérifiez les en-têtes de votre fichier Excel.', 'Éléments AccountReport', '0 éléments', 'Assurez-vous que les colonnes sont correctement nommées', 'Global');
+        }
+
         // 5. Validate MessageSpec
         $this->validateMessageSpec();
         // 6. Validate ReportingFI
@@ -170,6 +177,9 @@ class FatcaValidator
         for ($i = 0; $i < $reports->length; $i++) {
             $node = $reports->item($i);
             
+            // Track Excel row reference
+            $this->currentRowIndex = $node->hasAttribute('rowIndex') ? (int)$node->getAttribute('rowIndex') : null;
+
             // 1. AccountNumber
             $this->validateElement($node, 'ftc:AccountNumber', 'AccountNumber', 1, 100, 'Section 6.4.2', true);
 
@@ -406,6 +416,7 @@ class FatcaValidator
             'severity' => $severity,
             'category' => $category,
             'element' => $element,
+            'row_reference' => $this->currentRowIndex,
             'message' => $message,
             'expected_value' => $expected,
             'actual_value' => (string)$actual,

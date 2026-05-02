@@ -38,6 +38,7 @@ class ExcelToXmlConverter
             'success' => true,
             'xml' => $xmlContent,
             'records' => count($this->data),
+            'raw_data' => $this->data,
             'mapping' => $mapping,
             'headers_detected' => $this->headers,
         ];
@@ -155,7 +156,7 @@ class ExcelToXmlConverter
             'tin_issuer' => ['tin_issued_by', 'tin_issuer', 'pays_tin', 'tin_country', 'issued_by'],
 
             // Address
-            'country_code' => ['country_code', 'code_pays', 'country', 'pays', 'pays_residence', 'res_country'],
+            'country_code' => ['country_code', 'code_pays', 'country', 'pays', 'pays_residence', 'res_country', 'rescountrycode'],
             'address' => ['address', 'adresse', 'address_free', 'adresse_libre', 'full_address'],
             'city' => ['city', 'ville', 'town', 'localite'],
             'street' => ['street', 'rue', 'avenue', 'road'],
@@ -185,23 +186,39 @@ class ExcelToXmlConverter
             'filer_category' => ['filer_category', 'categorie', 'category', 'type_declarant'],
         ];
 
+        $matchedCount = 0;
         foreach ($patterns as $fatcaField => $possibleHeaders) {
             foreach ($this->headers as $header) {
                 $normalizedHeader = $this->normalizeHeader($header);
                 foreach ($possibleHeaders as $pattern) {
-                    if ($normalizedHeader === $pattern || str_contains($normalizedHeader, $pattern) || str_contains($pattern, $normalizedHeader)) {
+                    if ($normalizedHeader === $pattern || preg_match('/(?:\b|_)' . preg_quote($pattern, '/') . '(?:\b|_)/i', $normalizedHeader)) {
                         $mapping[$fatcaField] = $header;
+                        $matchedCount++;
                         break 2;
                     }
                 }
             }
         }
 
-        // Map remaining unmapped columns
-        $mappedHeaders = array_values($mapping);
-        foreach ($this->headers as $header) {
-            if (!in_array($header, $mappedHeaders) && !empty($header)) {
-                $mapping['unmapped_' . $header] = $header;
+        // Positional Fallback if no headers were detected
+        if ($matchedCount < 3 && count($this->headers) >= 10) {
+            $positional = [
+                'last_name' => 0,
+                'first_name' => 1,
+                'middle_name' => 2,
+                'city' => 3,
+                'address' => 4,
+                'postal_code' => 5,
+                'account_number' => 7,
+                'account_balance' => 9,
+                'birth_date' => 10,
+                'country_code' => 13,
+                'tin' => 14,
+            ];
+            foreach ($positional as $field => $pos) {
+                if (isset($this->headers[$pos]) && !isset($mapping[$field])) {
+                    $mapping[$field] = $this->headers[$pos];
+                }
             }
         }
 
@@ -324,12 +341,20 @@ class ExcelToXmlConverter
     {
         $ar = $this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AccountReport');
 
+        if (isset($row['_row_index'])) {
+            $ar->setAttribute('rowIndex', $row['_row_index']);
+        }
+
         // DocSpec
         $ar->appendChild($this->buildDocSpec('FATCA1'));
 
         // AccountNumber
-        $acctNum = $this->getMappedValue($row, $mapping, 'account_number') ?: 'NANUM';
-        $ar->appendChild($this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AccountNumber', $this->escapeXml($acctNum)));
+        $acctNum = $this->getMappedValue($row, $mapping, 'account_number');
+        if (!empty($acctNum)) {
+            $ar->appendChild($this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AccountNumber', $this->escapeXml($acctNum)));
+        } else {
+             $ar->appendChild($this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AccountNumber', ''));
+        }
 
         // AccountClosed
         $closed = $this->getMappedValue($row, $mapping, 'account_closed');
@@ -344,57 +369,59 @@ class ExcelToXmlConverter
         $orgName = $this->getMappedValue($row, $mapping, 'org_name');
         $firstName = $this->getMappedValue($row, $mapping, 'first_name');
 
-        if (!empty($orgName) && empty($firstName)) {
+        if (!empty($orgName)) {
             // Organisation
             $org = $this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:Organisation');
 
-            $orgCountry = $this->getMappedValue($row, $mapping, 'country_code') ?: 'US';
-            $org->appendChild($this->createSfaElement('ResCountryCode', $orgCountry));
+            $orgCountry = $this->getMappedValue($row, $mapping, 'country_code');
+            if (!empty($orgCountry)) {
+                $org->appendChild($this->createSfaElement('ResCountryCode', $orgCountry));
+            }
 
             $tin = $this->getMappedValue($row, $mapping, 'tin');
             if (!empty($tin)) {
                 $tinElem = $this->createSfaElement('TIN', $this->escapeXml($tin));
-                $issuer = $this->getMappedValue($row, $mapping, 'tin_issuer') ?: 'US';
+                $issuer = $this->getMappedValue($row, $mapping, 'tin_issuer') ?: $orgCountry ?: 'US';
                 $tinElem->setAttribute('issuedBy', $issuer);
                 $org->appendChild($tinElem);
             }
 
             $org->appendChild($this->createSfaElement('Name', $this->escapeXml($orgName)));
-
-            $addrElem = $this->buildAddress($row, $mapping);
-            $org->appendChild($addrElem);
-
+            $org->appendChild($this->buildAddress($row, $mapping));
             $holder->appendChild($org);
 
             // AcctHolderType
-            $holderType = $this->getMappedValue($row, $mapping, 'account_holder_type') ?: 'FATCA104';
-            $holder->appendChild($this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AcctHolderType', $holderType));
+            $holderType = $this->getMappedValue($row, $mapping, 'account_holder_type');
+            if (!empty($holderType)) {
+                $holder->appendChild($this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AcctHolderType', $holderType));
+            }
         } else {
             // Individual
             $individual = $this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:Individual');
 
-            $indCountry = $this->getMappedValue($row, $mapping, 'country_code') ?: 'US';
-            $individual->appendChild($this->createSfaElement('ResCountryCode', $indCountry));
+            $indCountry = $this->getMappedValue($row, $mapping, 'country_code');
+            if (!empty($indCountry)) {
+                $individual->appendChild($this->createSfaElement('ResCountryCode', $indCountry));
+            }
 
             $tin = $this->getMappedValue($row, $mapping, 'tin');
             if (!empty($tin)) {
                 $tinElem = $this->createSfaElement('TIN', $this->escapeXml($tin));
-                $issuer = $this->getMappedValue($row, $mapping, 'tin_issuer') ?: 'US';
+                $issuer = $this->getMappedValue($row, $mapping, 'tin_issuer') ?: $indCountry ?: 'US';
                 $tinElem->setAttribute('issuedBy', $issuer);
                 $individual->appendChild($tinElem);
             }
 
             // Name
             $nameElem = $this->dom->createElementNS('urn:oecd:ties:stffatcatypes:v2', 'sfa:Name');
-            $fn = $firstName ?: 'NFN';
-            $ln = $this->getMappedValue($row, $mapping, 'last_name') ?: 'UNKNOWN';
-            $nameElem->appendChild($this->createSfaElement('FirstName', $this->escapeXml($fn)));
+            $nameElem->appendChild($this->createSfaElement('FirstName', $this->escapeXml($firstName)));
 
             $mn = $this->getMappedValue($row, $mapping, 'middle_name');
             if (!empty($mn)) {
                 $nameElem->appendChild($this->createSfaElement('MiddleName', $this->escapeXml($mn)));
             }
 
+            $ln = $this->getMappedValue($row, $mapping, 'last_name');
             $nameElem->appendChild($this->createSfaElement('LastName', $this->escapeXml($ln)));
             $individual->appendChild($nameElem);
 
@@ -415,10 +442,9 @@ class ExcelToXmlConverter
         $ar->appendChild($holder);
 
         // AccountBalance
-        $balance = $this->getMappedValue($row, $mapping, 'account_balance') ?: '0.00';
-        $balance = $this->formatAmount($balance);
+        $balance = $this->getMappedValue($row, $mapping, 'account_balance');
         $currency = $this->getMappedValue($row, $mapping, 'currency') ?: 'USD';
-        $balElem = $this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AccountBalance', $balance);
+        $balElem = $this->dom->createElementNS('urn:oecd:ties:fatca:v2', 'ftc:AccountBalance', $this->formatAmount($balance));
         $balElem->setAttribute('currCode', strtoupper($currency));
         $ar->appendChild($balElem);
 
