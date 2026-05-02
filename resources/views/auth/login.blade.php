@@ -1,8 +1,6 @@
 <x-guest-layout>
-    <div class="auth-header">
-        <div class="bg-primary bg-opacity-10 p-3 rounded-circle d-inline-block mb-3">
-            <i class="fas fa-bank text-primary fs-2"></i>
-        </div>
+    <div class="auth-header text-center">
+        <img src="{{ asset('images/logo.jpg') }}" alt="CBC Logo" class="mb-3 rounded shadow-sm" style="max-height: 80px;">
         <h4 class="fw-bold text-dark mb-1">CBC BANK</h4>
         <p class="text-muted small mb-0">Compliance FATCA Portal</p>
     </div>

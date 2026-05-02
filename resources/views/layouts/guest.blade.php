@@ -12,7 +12,7 @@
         
         <style>
             body {
-                background: linear-gradient(135deg, #0d3b66 0%, #08243e 100%);
+                background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;

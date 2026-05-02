@@ -11,7 +11,7 @@
                 <div class="card-body p-0">
                     <div class="row g-0">
                         <div
-                            class="col-md-4 bg-primary bg-gradient text-white p-4 d-flex flex-column justify-content-center align-items-center">
+                            class="col-md-4 bg-dark text-white p-4 d-flex flex-column justify-content-center align-items-center border-end border-primary border-opacity-25">
                             <div class="compliance-gauge position-relative" style="height: 140px; width: 140px;">
                                 <canvas id="complianceGauge"></canvas>
                                 <div class="position-absolute top-50 start-50 translate-middle mt-2 text-center">
@@ -20,18 +20,18 @@
                                         style="font-size: 0.6rem; letter-spacing: 1px;">SCORE</small>
                                 </div>
                             </div>
-                            <div class="mt-3 text-white-50 small text-uppercase fw-bold">Conformité Globale</div>
+                            <div class="mt-3 text-cbc-gold small text-uppercase fw-bold">Conformité Globale</div>
                         </div>
                         <div class="col-md-8 p-4">
                             <div class="d-flex justify-content-between align-items-start mb-4">
                                 <div>
                                     <h4 class="fw-bold text-dark mb-1">{{ $report->original_filename }}</h4>
                                     <div class="d-flex align-items-center text-muted small">
-                                        <span class="badge bg-light text-dark border me-2"><i
-                                                class="fas fa-calendar me-1 text-primary"></i>
+                                        <span class="badge bg-cbc-dark text-cbc-gold border me-2"><i
+                                                class="fas fa-calendar me-1"></i>
                                             {{ $report->reporting_period ? $report->reporting_period->format('Y') : '2024' }}</span>
-                                        <span class="badge bg-light text-dark border"><i
-                                                class="fas fa-clock me-1 text-primary"></i>
+                                        <span class="badge bg-cbc-dark text-cbc-gold border"><i
+                                                class="fas fa-clock me-1"></i>
                                             {{ $report->created_at->format('d M H:i') }}</span>
                                     </div>
                                 </div>
@@ -57,9 +57,9 @@
                                 </div>
                                 <div class="col-4">
                                     <div
-                                        class="p-3 rounded-4 bg-primary bg-opacity-10 border border-primary border-opacity-10 text-center h-100">
-                                        <h4 class="fw-bold mb-0 text-primary">{{ $report->total_records }}</h4>
-                                        <small class="text-primary small fw-medium">Lignes</small>
+                                        class="p-3 rounded-4 bg-cbc-dark bg-opacity-10 border border-cbc-dark border-opacity-10 text-center h-100">
+                                        <h4 class="fw-bold mb-0 text-cbc-gold">{{ $report->total_records }}</h4>
+                                        <small class="text-muted small fw-medium">Lignes</small>
                                     </div>
                                 </div>
                             </div>
@@ -74,8 +74,8 @@
             <div class="card border-0 shadow-lg h-100 overflow-hidden" style="border-radius: 1.5rem;">
                 <div class="card-header bg-white border-0 py-3 px-4">
                     <h6 class="fw-bold mb-0 d-flex align-items-center">
-                        <span class="p-2 bg-primary bg-opacity-10 rounded-3 me-2">
-                            <i class="fas fa-bolt text-primary"></i>
+                        <span class="p-2 bg-cbc-gold bg-opacity-10 rounded-3 me-2">
+                            <i class="fas fa-bolt text-cbc-gold"></i>
                         </span>
                         Actions de Remédiation
                     </h6>
@@ -198,12 +198,12 @@
                                             <div class="scale-hover">{!! $error->severity_badge !!}</div>
                                         </td>
                                         <td>
-                                            <div class="fw-bold text-primary mb-0">{{ $error->element }}</div>
+                                            <div class="fw-bold text-cbc-dark mb-0">{{ $error->element }}</div>
                                             <span
                                                 class="badge bg-light text-muted fw-normal p-0">{{ $error->category_label }}</span>
                                             @if($error->row_reference !== null)
                                                 <div class="mt-1">
-                                                    <span class="badge bg-soft-info text-info rounded-pill"
+                                                    <span class="badge bg-cbc-gold bg-opacity-25 text-cbc-dark rounded-pill"
                                                         style="font-size: 0.6rem;">Ligne Excel #{{ $error->row_reference }}</span>
                                                 </div>
                                             @endif
@@ -496,12 +496,12 @@
         }
 
         .nav-tabs .nav-link:hover {
-            color: #0d6efd;
+            color: #d4af37;
         }
 
         .nav-tabs .nav-link.active {
-            color: #0d6efd;
-            border-bottom: 3px solid #0d6efd !important;
+            color: #d4af37;
+            border-bottom: 3px solid #d4af37 !important;
             background: transparent;
         }
 
@@ -509,7 +509,8 @@
         #excelSpreadsheet thead th {
             font-size: 0.7rem;
             font-weight: 700;
-            color: #495057;
+            color: #1a1a1a;
+            background: #f8f9fa;
         }
 
         #excelSpreadsheet tbody td {

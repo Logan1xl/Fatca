@@ -41,7 +41,7 @@ class ValidationError extends Model
         return match ($this->severity) {
             'error' => '<span class="badge bg-danger bg-opacity-10 text-danger compliance-badge"><i class="fas fa-times-circle me-1"></i>Erreur</span>',
             'warning' => '<span class="badge bg-warning bg-opacity-10 text-warning compliance-badge"><i class="fas fa-exclamation-triangle me-1"></i>Alerte</span>',
-            'info' => '<span class="badge bg-info bg-opacity-10 text-info compliance-badge"><i class="fas fa-info-circle me-1"></i>Info</span>',
+            'info' => '<span class="badge bg-cbc-gold bg-opacity-10 text-cbc-dark compliance-badge"><i class="fas fa-info-circle me-1"></i>Info</span>',
             default => '<span class="badge bg-secondary bg-opacity-10 text-secondary compliance-badge">N/A</span>',
         };
     }

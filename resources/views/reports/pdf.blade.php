@@ -12,13 +12,13 @@
             padding: 20px;
         }
         .header {
-            border-bottom: 2px solid #0d3b66;
+            border-bottom: 3px solid #d4af37;
             padding-bottom: 10px;
             margin-bottom: 30px;
         }
         .bank-name {
-            color: #0d3b66;
-            font-size: 24px;
+            color: #1a1a1a;
+            font-size: 28px;
             font-weight: bold;
         }
         .report-title {
@@ -49,11 +49,12 @@
         .status-errors { background: #f8d7da; color: #721c24; }
         
         .section-title {
-            background: #f4f4f9;
-            padding: 8px 15px;
+            background: #f8f9fa;
+            padding: 10px 15px;
             font-weight: bold;
-            border-left: 5px solid #0d3b66;
+            border-left: 6px solid #d4af37;
             margin: 25px 0 15px 0;
+            color: #1a1a1a;
         }
         
         table.data-table {
@@ -61,7 +62,8 @@
             border-collapse: collapse;
         }
         table.data-table th {
-            background: #0d3b66;
+            background: #1a1a1a;
+            border-bottom: 3px solid #d4af37;
             color: white;
             text-align: left;
             padding: 10px;
@@ -90,6 +92,9 @@
     <div class="header">
         <table style="width: 100%;">
             <tr>
+                <td style="width: 80px;">
+                    <img src="{{ $logo_path }}" style="width: 70px;">
+                </td>
                 <td>
                     <div class="bank-name">CBC BANK</div>
                     <div class="report-title">Rapport de Conformité FATCA</div>

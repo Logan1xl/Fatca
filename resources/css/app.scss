@@ -2,14 +2,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 // Variables
-$primary: #0d3b66;
-$secondary: #6c757d;
+// Variables
+$cbc-gold: #d4af37;
+$cbc-black: #1a1a1a;
+$cbc-grey: #a6a9ac;
+
+$primary: $cbc-gold;
+$secondary: $cbc-black;
 $success: #2a9d8f;
-$info: #4895ef;
+$info: $cbc-grey;
 $warning: #f4a261;
 $danger: #e76f51;
-$light: #f4f4f9;
-$dark: #212529;
+$light: #f8f9fa;
+$dark: $cbc-black;
 
 $font-family-sans-serif: 'Inter', sans-serif;
 $body-bg: $light;
@@ -31,98 +36,110 @@ $card-box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 // Custom Styles
 body {
     font-size: 0.95rem;
+    color: #333;
 }
 
 .sidebar {
-    background: $primary;
-    color: white;
-    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+    background: #1a1a1a !important; /* Force CBC Black */
+    color: white !important;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.2);
     z-index: 1000;
     position: sticky;
     top: 0;
     height: 100vh;
     overflow-y: auto;
+    border-right: 3px solid #d4af37 !important; /* Force CBC Gold */
 }
 
 .sidebar .nav-link {
-    color: rgba(255,255,255,0.7);
-    padding: 0.8rem 1.5rem;
+    color: rgba(255,255,255,0.8) !important;
+    padding: 1rem 1.5rem;
     border-radius: 0;
     transition: all 0.3s;
     font-weight: 500;
+    border-left: 4px solid transparent;
 }
 
 .sidebar .nav-link:hover, .sidebar .nav-link.active {
-    color: white;
-    background: rgba(255,255,255,0.1);
-    border-left: 4px solid $success;
+    color: #d4af37 !important;
+    background: rgba(212, 175, 55, 0.1) !important;
+    border-left: 4px solid #d4af37 !important;
 }
 
-.sidebar .nav-link i {
-    width: 25px;
+.sidebar-header {
+    background: #1a1a1a !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
 }
 
 .navbar-main {
     background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border-bottom: 1px solid #eee;
 }
+
+.btn-cbc-gold {
+    background-color: #d4af37 !important;
+    color: #1a1a1a !important;
+    border: none !important;
+    font-weight: 700 !important;
+}
+
+.btn-cbc-gold:hover {
+    background-color: #c49a2d !important;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4);
+}
+
+.btn-cbc-dark {
+    background-color: #1a1a1a !important;
+    color: #d4af37 !important;
+    border: 1px solid #d4af37 !important;
+}
+
+.text-cbc-gold { color: #d4af37 !important; }
+.bg-cbc-gold { background-color: #d4af37 !important; }
+.bg-cbc-dark { background-color: #1a1a1a !important; }
 
 .card-stats {
     transition: transform 0.3s;
-    border-left: 4px solid $primary;
-}
-
-.card-stats:hover {
-    transform: translateY(-5px);
-}
-
-.btn-primary {
-    background-color: $primary;
-    border-color: $primary;
-}
-
-.btn-primary:hover {
-    background-color: darken($primary, 10%);
-    border-color: darken($primary, 10%);
+    border-top: 4px solid #d4af37 !important;
 }
 
 .compliance-badge {
-    padding: 0.5em 1em;
+    padding: 0.5em 1.2em;
     border-radius: 50px;
-    font-weight: 600;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
 }
 
 .upload-area {
-    border: 2px dashed #dee2e6;
-    border-radius: 1rem;
-    padding: 3rem 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s;
+    border: 2px dashed #d4af37;
+    border-radius: 1.5rem;
+    padding: 4rem 2rem;
     background: #fff;
+    transition: all 0.3s;
 }
 
 .upload-area:hover {
-    border-color: $primary;
-    background: rgba(13, 59, 102, 0.02);
+    background: rgba(212, 175, 55, 0.05);
 }
 
-.compliance-gauge {
-    max-width: 150px;
-    margin: 0 auto;
+// Override primary buttons globally
+.btn-primary {
+    @extend .btn-cbc-gold;
 }
 
 // Custom Scrollbar
 ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 ::-webkit-scrollbar-track {
     background: #f1f1f1;
 }
 ::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 4px;
+    background: #d4af37;
+    border-radius: 10px;
 }
-::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
+

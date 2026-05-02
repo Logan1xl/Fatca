@@ -18,7 +18,7 @@ class PdfReportGenerator
         $data = [
             'report' => $report,
             'errors' => $report->validationErrors()->orderBy('severity')->get(),
-            'logo_path' => public_path('images/cbc-bank.jpg'),
+            'logo_path' => public_path('images/logo.jpg'),
             'date' => now()->format('d/m/Y H:i'),
         ];
 

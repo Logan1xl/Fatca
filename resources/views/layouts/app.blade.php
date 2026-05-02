@@ -14,9 +14,10 @@
         <div class="d-flex min-vh-100">
             <!-- Sidebar -->
             <nav class="sidebar d-none d-md-block flex-shrink-0" style="width: 280px;">
-                    <div class="sidebar-header p-4 text-center">
-                        <h4 class="fw-bold mb-0">CBC BANK</h4>
-                        <small class="opacity-75">FATCA Compliance</small>
+                    <div class="sidebar-header p-4 text-center bg-cbc-dark border-bottom border-cbc-gold border-opacity-25">
+                        <img src="{{ asset('images/logo.jpg') }}" alt="CBC Logo" class="img-fluid rounded mb-3 shadow-sm" style="max-height: 60px;">
+                        <h5 class="fw-bold mb-0 text-cbc-gold">CBC BANK</h5>
+                        <small class="text-white opacity-50">FATCA Reporting System</small>
                     </div>
                     
                     <div class="nav flex-column mt-3">

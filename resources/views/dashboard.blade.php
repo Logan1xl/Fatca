@@ -9,8 +9,8 @@
     <div class="col-md-3">
         <div class="card card-stats p-3 h-100 shadow-sm border-0">
             <div class="d-flex align-items-center">
-                <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
-                    <i class="fas fa-file-alt text-primary fs-4"></i>
+                <div class="bg-cbc-gold bg-opacity-10 p-3 rounded-circle me-3">
+                    <i class="fas fa-file-alt text-cbc-gold fs-4"></i>
                 </div>
                 <div>
                     <h4 class="fw-bold mb-0">{{ $stats['total_reports'] }}</h4>
@@ -46,10 +46,10 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card card-stats p-3 h-100 shadow-sm border-0" style="border-left-color: #4895ef;">
+        <div class="card card-stats p-3 h-100 shadow-sm border-0" style="border-left-color: #d4af37;">
             <div class="d-flex align-items-center">
-                <div class="bg-info bg-opacity-10 p-3 rounded-circle me-3">
-                    <i class="fas fa-shield-alt text-info fs-4"></i>
+                <div class="bg-cbc-gold bg-opacity-10 p-3 rounded-circle me-3">
+                    <i class="fas fa-shield-alt text-cbc-gold fs-4"></i>
                 </div>
                 <div>
                     <h4 class="fw-bold mb-0">{{ number_format($stats['avg_compliance'], 1) }}%</h4>
@@ -101,7 +101,7 @@
                                     @elseif($report->status == 'errors_found')
                                         <span class="badge bg-danger bg-opacity-10 text-danger compliance-badge">Erreurs</span>
                                     @elseif($report->status == 'corrected')
-                                        <span class="badge bg-info bg-opacity-10 text-info compliance-badge">Corrigé</span>
+                                        <span class="badge bg-cbc-gold bg-opacity-10 text-cbc-gold compliance-badge">Corrigé</span>
                                     @else
                                         <span class="badge bg-secondary bg-opacity-10 text-secondary compliance-badge">{{ $report->status }}</span>
                                     @endif
@@ -111,7 +111,7 @@
                                 </td>
                                 <td class="text-end px-4">
                                     <a href="{{ route('reports.show', $report->id) }}" class="btn btn-light btn-sm rounded-circle">
-                                        <i class="fas fa-eye text-primary"></i>
+                                        <i class="fas fa-eye text-cbc-gold"></i>
                                     </a>
                                 </td>
                             </tr>

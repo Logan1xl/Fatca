@@ -54,7 +54,7 @@
                         <td>
                             <div class="d-flex align-items-center" style="width: 140px;">
                                 <div class="progress flex-grow-1 me-2" style="height: 6px;">
-                                    <div class="progress-bar {{ $report->compliance_rate > 80 ? 'bg-success' : ($report->compliance_rate > 50 ? 'bg-warning' : 'bg-danger') }}" 
+                                    <div class="progress-bar {{ $report->compliance_rate > 80 ? 'bg-cbc-gold' : ($report->compliance_rate > 50 ? 'bg-warning' : 'bg-danger') }}" 
                                          role="progressbar" style="width: {{ $report->compliance_rate }}%"></div>
                                 </div>
                                 <span class="small fw-bold">{{ $report->compliance_rate }}%</span>
@@ -69,7 +69,7 @@
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg">
-                                    <li><a class="dropdown-item py-2" href="{{ route('reports.show', $report->id) }}"><i class="fas fa-eye text-primary me-2"></i> Voir les détails</a></li>
+                                    <li><a class="dropdown-item py-2" href="{{ route('reports.show', $report->id) }}"><i class="fas fa-eye text-cbc-gold me-2"></i> Voir les détails</a></li>
                                     <li><a class="dropdown-item py-2" href="{{ route('reports.download_pdf', $report->id) }}"><i class="fas fa-file-pdf text-danger me-2"></i> Télécharger PDF</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
