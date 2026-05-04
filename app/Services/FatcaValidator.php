@@ -135,9 +135,9 @@ class FatcaValidator
         } else {
             $val = $nodes->item(0)->textContent;
             $this->validateStringNoPadding($val, 'MessageRefId', 'Section 3.6');
-            $this->validateStringSize($val, 'MessageRefId', 1, 200, 'Section 3.6');
+            $this->validateStringSize($val, 'MessageRefId', 1, 170, 'Section 3.6'); // P5124 suggests limit under 200, but often 170 in practice
             if (preg_match('/[^a-zA-Z0-9+_.\-]/', $val)) {
-                $this->addError('warning', 'characters', 'MessageRefId', 'Caractères spéciaux non recommandés', 'Alphanumériques, +, _, -, .', $val, 'Éviter les espaces et caractères spéciaux', 'Section 2.3');
+                $this->addError('warning', 'characters', 'MessageRefId', 'Caractères spéciaux non recommandés dans l\'ID', 'Alphanumériques, +, _, -, .', $val, 'Éviter les espaces et caractères spéciaux', 'Section 2.3', true);
             }
         }
         
@@ -340,10 +340,12 @@ class FatcaValidator
             $this->addError('error', 'financial', $label.'/currCode', 'Devise manquante pour le montant', 'Code ISO (ex: USD, XAF)', 'absent', 'Préciser la devise', $section);
         }
 
-        if (!is_numeric(str_replace(',', '.', $val))) {
+        if (!is_numeric(str_replace([' ', ','], ['', '.'], $val))) {
             $this->addError('error', 'format', $label, 'Format numérique invalide', 'Nombre (Ex: 1250.50)', $val, 'Utiliser des chiffres et le point comme séparateur', $section, true);
         } elseif (str_contains($val, ',')) {
             $this->addError('error', 'format', $label, 'Séparateur décimal invalide (virgule)', 'Point (.)', $val, 'Remplacer la virgule par un point', $section, true);
+        } elseif (str_contains($val, ' ')) {
+            $this->addError('warning', 'format', $label, 'Espaces présents dans le montant', 'Pas d\'espaces', $val, 'Supprimer les espaces de séparation de milliers', $section, true);
         }
     }
 
@@ -388,7 +390,12 @@ class FatcaValidator
         $tinDash2 = '/^\d{2}-\d{7}$/';
         
         if (!preg_match($giinPattern, $val) && !preg_match($tin9, $val) && !preg_match($tinDash1, $val) && !preg_match($tinDash2, $val)) {
-            $this->addError('error', $category, $element, 'Format TIN non conforme (doit être 9 chiffres ou GIIN)', 'SSN, ITIN, EIN ou GIIN', $val, 'Corriger le format du TIN', $section, true);
+            // Check if it's just a placeholder like "000000000" or "UNKNOWN"
+            if (in_array(strtoupper($val), ['UNKNOWN', 'N/A', 'NONE', '000000000'])) {
+                $this->addError('warning', 'data', $element, 'TIN manquant ou valeur de remplissage détectée', 'SSN, ITIN, EIN ou GIIN', $val, 'Fournir un TIN valide si possible', $section, false);
+            } else {
+                $this->addError('error', $category, $element, 'Format TIN non conforme (doit être 9 chiffres ou GIIN)', 'SSN, ITIN, EIN ou GIIN', $val, 'Corriger le format du TIN (9 chiffres ou XX9999.XXXXX.XX.999)', $section, true);
+            }
         }
     }
 
@@ -472,8 +479,7 @@ class FatcaValidator
         $this->report->update([
             'total_errors' => $errorCount,
             'total_warnings' => $warningCount,
-            'status' => $errorCount > 0 ? 'errors_found' : 'valid',
-            // Note: total_records is updated in controller, but we could update compliance here if we add the column
+            'status' => $errorCount > 0 ? 'errors_found' : 'corrected',
         ]);
     }
 }

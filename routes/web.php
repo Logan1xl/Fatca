@@ -18,8 +18,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('reports', ReportController::class);
     Route::get('reports/{report}/download-xml', [ReportController::class, 'downloadXml'])->name('reports.download_xml');
     Route::get('reports/{report}/download-corrected', [ReportController::class, 'downloadCorrectedXml'])->name('reports.download_corrected');
+    Route::post('reports/{report}/apply-autofix', [ReportController::class, 'applyAutoCorrection'])->name('reports.apply_autofix');
     Route::get('reports/{report}/download-pdf', [ReportController::class, 'downloadPdf'])->name('reports.download_pdf');
     Route::post('reports/{report}/encrypt', [ReportController::class, 'encrypt'])->name('reports.encrypt');
+    Route::get('reports/{report}/edit-data', [ReportController::class, 'editData'])->name('reports.edit_data');
+    Route::patch('reports/{report}/update-data', [ReportController::class, 'updateData'])->name('reports.update_data');
+    Route::post('reports/{report}/generate-xml', [ReportController::class, 'generateXml'])->name('reports.generate_xml');
 
     // Audit Logs
     Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');

@@ -32,13 +32,31 @@ class ExcelToXmlConverter
         $this->headers = array_keys($this->data[0] ?? []);
         $mapping = $this->detectColumnMapping();
 
+        return $this->processConversion($this->data, $mapping, $reportingPeriod);
+    }
+
+    /**
+     * Génère le XML à partir des données fournies (utilisé pour les corrections manuelles).
+     */
+    public function generateFromRawData(array $data, array $mapping, ?string $reportingPeriod = null): string
+    {
+        $this->data = $data;
+        $this->headers = array_keys($data[0] ?? []);
+        return $this->buildFatcaXml($mapping, $reportingPeriod);
+    }
+
+    /**
+     * Centralise la logique de retour après traitement.
+     */
+    private function processConversion(array $data, array $mapping, ?string $reportingPeriod): array
+    {
         $xmlContent = $this->buildFatcaXml($mapping, $reportingPeriod);
 
         return [
             'success' => true,
             'xml' => $xmlContent,
-            'records' => count($this->data),
-            'raw_data' => $this->data,
+            'records' => count($data),
+            'raw_data' => $data,
             'mapping' => $mapping,
             'headers_detected' => $this->headers,
         ];
@@ -56,18 +74,25 @@ class ExcelToXmlConverter
             
             if (empty($rows)) continue;
 
-            // Detect header row (first row with significant data)
+            // Recherche de la ligne d'en-tête en utilisant des mots-clés FATCA connus
             $headerRowIndex = null;
             $headers = [];
+            $keywords = ['nom', 'name', 'prenom', 'first', 'account', 'compte', 'tin', 'nif', 'giin', 'balance', 'solde', 'birth', 'naissance', 'country', 'pays', 'address', 'adresse'];
             
             foreach ($rows as $index => $row) {
-                $nonEmptyCount = 0;
+                $matchScore = 0;
                 foreach ($row as $val) {
-                    if (!empty(trim((string)$val))) $nonEmptyCount++;
+                    $cellText = mb_strtolower((string)$val, 'UTF-8');
+                    foreach ($keywords as $kw) {
+                        if (str_contains($cellText, $kw)) {
+                            $matchScore++;
+                            break;
+                        }
+                    }
                 }
                 
-                // If we find a row with at least 2 potential headers, assume it's the header row
-                if ($nonEmptyCount >= 2) {
+                // Si on trouve au moins 3 mots-clés, c'est probablement la ligne d'en-tête
+                if ($matchScore >= 3) {
                     $headerRowIndex = $index;
                     foreach ($row as $col => $header) {
                         $headerText = (string)($header ?? '');
@@ -75,12 +100,20 @@ class ExcelToXmlConverter
                             $headers[$col] = $this->normalizeHeader($headerText);
                         }
                     }
-                    // Only accept if we actually got some valid headers
-                    if (count($headers) >= 2) {
+                    break;
+                }
+            }
+
+            // Si aucune ligne n'a assez de mots-clés, on prend la première ligne non vide comme repli
+            if ($headerRowIndex === null) {
+                foreach ($rows as $index => $row) {
+                    $nonEmpty = array_filter($row, fn($v) => !empty(trim((string)$v)));
+                    if (count($nonEmpty) >= 3) {
+                        $headerRowIndex = $index;
+                        foreach ($row as $col => $header) {
+                            $headers[$col] = $this->normalizeHeader((string)$header);
+                        }
                         break;
-                    } else {
-                        $headerRowIndex = null;
-                        $headers = [];
                     }
                 }
             }
@@ -126,7 +159,14 @@ class ExcelToXmlConverter
      */
     private function normalizeHeader(string $header): string
     {
-        $header = strtolower($header);
+        $header = mb_strtolower($header, 'UTF-8');
+        // Remove accents
+        $header = strtr($header, [
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a', 'æ' => 'ae', 'ç' => 'c',
+            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e', 'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ð' => 'o', 'ñ' => 'n', 'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'ø' => 'o',
+            'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u', 'ý' => 'y', 'ÿ' => 'y'
+        ]);
         $header = preg_replace('/[^a-z0-9_\s]/', '', $header);
         $header = preg_replace('/\s+/', '_', $header);
         return trim($header, '_');
@@ -140,45 +180,45 @@ class ExcelToXmlConverter
         $mapping = [];
         $patterns = [
             // MessageSpec
-            'sending_company' => ['giin', 'sending_company', 'sendingcompanyin', 'company_in', 'filer_giin', 'giin_emetteur'],
-            'transmitting_country' => ['transmitting_country', 'pays_emetteur', 'country_code_sender', 'pays_envoi'],
-            'receiving_country' => ['receiving_country', 'pays_destinataire', 'country_code_receiver', 'pays_reception'],
-            'reporting_period' => ['reporting_period', 'periode', 'period', 'annee', 'year', 'tax_year', 'annee_fiscale'],
+            'sending_company' => ['giin', 'sending_company', 'sendingcompanyin', 'company_in', 'filer_giin', 'giin_emetteur', 'id_institution', 'sendingcompany'],
+            'transmitting_country' => ['transmitting_country', 'pays_emetteur', 'country_code_sender', 'pays_envoi', 'transmittingcountry'],
+            'receiving_country' => ['receiving_country', 'pays_destinataire', 'country_code_receiver', 'pays_reception', 'receivingcountry'],
+            'reporting_period' => ['reporting_period', 'periode', 'period', 'annee', 'year', 'tax_year', 'annee_fiscale', 'reportingperiod'],
 
             // Account Holder - Individual
-            'first_name' => ['first_name', 'firstname', 'prenom', 'given_name', 'nom_prenom', 'first'],
-            'last_name' => ['last_name', 'lastname', 'nom', 'family_name', 'surname', 'nom_famille'],
-            'middle_name' => ['middle_name', 'middlename', 'deuxieme_prenom', 'second_prenom'],
-            'birth_date' => ['birth_date', 'birthdate', 'date_naissance', 'dob', 'date_of_birth', 'naissance'],
+            'first_name' => ['first_name', 'firstname', 'prenom', 'given_name', 'nom_prenom', 'first', 'customer_first_name'],
+            'last_name' => ['last_name', 'lastname', 'nom', 'family_name', 'surname', 'nom_famille', 'customer_last_name'],
+            'middle_name' => ['middle_name', 'middlename', 'deuxieme_prenom', 'second_prenom', 'autres_prenoms'],
+            'birth_date' => ['birth_date', 'birthdate', 'date_naissance', 'dob', 'date_of_birth', 'naissance', 'dt_naiss'],
 
             // TIN
-            'tin' => ['tin', 'tax_id', 'tax_identification', 'numero_fiscal', 'ssn', 'itin', 'ein', 'nif', 'tin_titulaire'],
-            'tin_issuer' => ['tin_issued_by', 'tin_issuer', 'pays_tin', 'tin_country', 'issued_by'],
+            'tin' => ['tin', 'tax_id', 'tax_identification', 'numero_fiscal', 'ssn', 'itin', 'ein', 'nif', 'tin_titulaire', 'identifiant_fiscal'],
+            'tin_issuer' => ['tin_issued_by', 'tin_issuer', 'pays_tin', 'tin_country', 'issued_by', 'emetteur_nif'],
 
             // Address
-            'country_code' => ['country_code', 'code_pays', 'country', 'pays', 'pays_residence', 'res_country', 'rescountrycode'],
-            'address' => ['address', 'adresse', 'address_free', 'adresse_libre', 'full_address'],
-            'city' => ['city', 'ville', 'town', 'localite'],
-            'street' => ['street', 'rue', 'avenue', 'road'],
-            'postal_code' => ['postal_code', 'code_postal', 'zip', 'postcode', 'cp'],
+            'country_code' => ['country_code', 'code_pays', 'country', 'pays', 'pays_residence', 'res_country', 'rescountrycode', 'pays_client'],
+            'address' => ['address', 'adresse', 'address_free', 'adresse_libre', 'full_address', 'localité', 'quartier'],
+            'city' => ['city', 'ville', 'town', 'localite', 'city_name'],
+            'street' => ['street', 'rue', 'avenue', 'road', 'voie'],
+            'postal_code' => ['postal_code', 'code_postal', 'zip', 'postcode', 'cp', 'code_p'],
 
             // Account
-            'account_number' => ['account_number', 'numero_compte', 'account_no', 'acct_number', 'no_compte', 'iban'],
-            'account_balance' => ['account_balance', 'solde', 'balance', 'solde_compte', 'montant_solde'],
-            'currency' => ['currency', 'devise', 'currency_code', 'monnaie', 'curr'],
-            'account_closed' => ['account_closed', 'compte_ferme', 'closed', 'ferme', 'cloture'],
+            'account_number' => ['account_number', 'numero_compte', 'account_no', 'acct_number', 'no_compte', 'iban', 'num_compte', 'accountnumber'],
+            'account_balance' => ['account_balance', 'solde', 'balance', 'solde_compte', 'montant_solde', 'balance_amount', 'accountbalance'],
+            'currency' => ['currency', 'devise', 'currency_code', 'monnaie', 'curr', 'dev', 'code_devise'],
+            'account_closed' => ['account_closed', 'compte_ferme', 'closed', 'ferme', 'cloture', 'etat_compte'],
 
             // Payments
-            'payment_dividends' => ['dividends', 'dividendes', 'payment_dividends', 'fatca501'],
-            'payment_interest' => ['interest', 'interets', 'payment_interest', 'fatca502'],
-            'payment_gross_proceeds' => ['gross_proceeds', 'produits_bruts', 'payment_gross', 'fatca503'],
-            'payment_other' => ['other_payment', 'autres_paiements', 'payment_other', 'fatca504', 'other'],
+            'payment_dividends' => ['dividends', 'dividendes', 'payment_dividends', 'fatca501', 'div'],
+            'payment_interest' => ['interest', 'interets', 'payment_interest', 'fatca502', 'int'],
+            'payment_gross_proceeds' => ['gross_proceeds', 'produits_bruts', 'payment_gross', 'fatca503', 'prod_brut'],
+            'payment_other' => ['other_payment', 'autres_paiements', 'payment_other', 'fatca504', 'other', 'divers'],
 
             // Account Holder Type
-            'account_holder_type' => ['account_holder_type', 'type_titulaire', 'acct_holder_type', 'holder_type', 'type_compte'],
+            'account_holder_type' => ['account_holder_type', 'type_titulaire', 'acct_holder_type', 'holder_type', 'type_compte', 'statut_fatca'],
 
             // Organisation
-            'org_name' => ['organisation_name', 'org_name', 'entity_name', 'nom_entite', 'nom_organisation', 'raison_sociale'],
+            'org_name' => ['organisation_name', 'org_name', 'entity_name', 'nom_entite', 'nom_organisation', 'raison_sociale', 'nom_entite_juridique'],
 
             // Reporting FI
             'fi_name' => ['fi_name', 'reporting_fi', 'nom_fi', 'institution_name', 'nom_institution', 'banque'],

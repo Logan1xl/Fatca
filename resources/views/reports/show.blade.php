@@ -82,22 +82,57 @@
                 </div>
                 <div class="card-body p-4 pt-2">
                     <div class="d-grid gap-3">
+                        <!-- Bouton de modification manuelle -->
+                        <a href="{{ route('reports.edit_data', $report->id) }}"
+                            class="btn btn-cbc-gold py-3 rounded-4 shadow-lg border-0 text-dark d-flex align-items-center justify-content-center hover-lift">
+                            <i class="fas fa-edit me-3 fs-5"></i>
+                            <div class="text-start">
+                                <div class="fw-bold">Modifier les Données</div>
+                                <div class="small opacity-75 text-dark">Édition manuelle des lignes</div>
+                            </div>
+                        </a>
+
                         @if($report->total_errors > 0)
-                            <a href="{{ route('reports.download_corrected', $report->id) }}"
-                                class="btn btn-primary py-3 rounded-4 shadow-lg border-0 d-flex align-items-center justify-content-center hover-lift">
-                                <i class="fas fa-magic me-3 fs-5"></i>
-                                <div class="text-start">
-                                    <div class="fw-bold">Corriger le Fichier</div>
-                                    <div class="small opacity-75">Auto-correction intelligente</div>
-                                </div>
-                            </a>
+                            <div class="alert alert-danger rounded-4 p-3 mb-0 small border-0 bg-opacity-10">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                <strong>Action requise :</strong> Des erreurs critiques ({{ $report->total_errors }}) bloquent la génération du XML.
+                            </div>
+                            
+                            <form action="{{ route('reports.apply_autofix', $report->id) }}" method="POST">
+                                @csrf
+                                <button type="submit"
+                                    class="btn btn-primary w-100 py-3 rounded-4 shadow-lg border-0 d-flex align-items-center justify-content-center hover-lift">
+                                    <i class="fas fa-magic me-3 fs-5"></i>
+                                    <div class="text-start">
+                                        <div class="fw-bold">Tentative Auto-Fix</div>
+                                        <div class="small opacity-75">Correction intelligente des formats</div>
+                                    </div>
+                                </button>
+                            </form>
+                        @elseif($report->status !== 'valid')
+                            <div class="alert alert-success rounded-4 p-3 mb-0 small border-0 bg-opacity-10">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <strong>Félicitations !</strong> Les données sont conformes. Vous pouvez générer le XML.
+                            </div>
+
+                            <form action="{{ route('reports.generate_xml', $report->id) }}" method="POST">
+                                @csrf
+                                <button type="submit"
+                                    class="btn btn-success w-100 py-3 rounded-4 shadow-lg border-0 text-white d-flex align-items-center justify-content-center hover-lift">
+                                    <i class="fas fa-cog fa-spin me-3 fs-5 text-white"></i>
+                                    <div class="text-start">
+                                        <div class="fw-bold text-white">Générer le XML Final</div>
+                                        <div class="small opacity-75 text-white">Prêt pour soumission IRS</div>
+                                    </div>
+                                </button>
+                            </form>
                         @else
                             <a href="{{ route('reports.download_xml', $report->id) }}"
                                 class="btn btn-success py-3 rounded-4 shadow-lg border-0 text-white d-flex align-items-center justify-content-center hover-lift">
-                                <i class="fas fa-file-export me-3 fs-5 text-white"></i>
+                                <i class="fas fa-file-download me-3 fs-5 text-white"></i>
                                 <div class="text-start">
-                                    <div class="fw-bold text-white">Télécharger XML</div>
-                                    <div class="small opacity-75 text-white">Prêt pour soumission IRS</div>
+                                    <div class="fw-bold text-white">Télécharger XML Final</div>
+                                    <div class="small opacity-75 text-white">Format FATCA v2.0</div>
                                 </div>
                             </a>
                         @endif
@@ -277,8 +312,13 @@
                             <h5 class="fw-bold mb-1">Visualisation des Données Sources</h5>
                             <p class="text-muted small mb-0">Contenu brut du fichier Excel avec marquage des anomalies</p>
                         </div>
-                        <div class="badge bg-primary rounded-pill px-3 py-2">
-                            {{ count($report->raw_data ?? []) }} Enregistrements
+                        <div class="d-flex gap-2 align-items-center">
+                            <a href="{{ route('reports.edit_data', $report->id) }}" class="btn btn-cbc-gold btn-sm rounded-pill px-3 fw-bold">
+                                <i class="fas fa-edit me-1"></i> Modifier ces données
+                            </a>
+                            <div class="badge bg-primary rounded-pill px-3 py-2">
+                                {{ count($report->raw_data ?? []) }} Enregistrements
+                            </div>
                         </div>
                     </div>
                 </div>
